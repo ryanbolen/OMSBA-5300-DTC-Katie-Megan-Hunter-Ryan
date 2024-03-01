@@ -1,26 +1,62 @@
 ---
+author: "Ryan Bolen, Katie Yamabe, Megan Mixon, Hunter Elliott"
 title: "DTC"
 format: html
 editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
 ```{r}
-1 + 1
+library(haven)
+library(dplyr)
+library(tidyr)
 ```
 
 You can add options to executable code like this
 
 ```{r}
-#| echo: false
-2 * 2
+main_data <- read_dta("IPUMS.dta.gz")
+
+```
+
+```{r}
+# Categorizing different industries - capturing retail and pulling a few other 'comparable' industries into a tibble to join up with the main data frame. 
+
+retail_codes <- c(5580,5180,5180,1190,3895,4770,4795,5370,5381,5391,5275)
+
+retail_tib <- tibble(ind = retail_codes,industry_name = 'retail')
+
+dining_codes <- c(8680,8690)
+
+dining_tib <- tibble(ind = dining_codes,industry_name = 'dining')
+
+entertainment_codes <- c(8562,8564,8570,8580,8590)
+
+entertainment_tib <- tibble(ind = entertainment_codes, industry_name = 'entertainment')
+
+big_tib <- retail_tib %>% bind_rows(dining_tib) %>% bind_rows(entertainment_tib)
+```
+
+```{r}
+
+# Get rid of observations without an industry specified in raw data and cutting down to not go past 2022
+
+main_data <- main_data %>% filter(!is.na(ind))
+main_data <- main_data %>% filter(year < 2023)
+
+# Join up main data frame with the actual industry name
+
+industry_sorted_data <- main_data %>% left_join(big_tib, join_by(ind))
+
+industry_sorted_data <- industry_sorted_data %>% mutate(industry_f = replace_na(industry_name,'other'))
+
+# Summarize the number of observations in our sample that are in each industry sector in each year 
+
+obs_per_year <- industry_sorted_data %>% select(year,cpsid,ind,industry_name,industry_f)
+
+obs_per_year <- obs_per_year %>% group_by(year,industry_f) %>% summarise(tot = n())
+
+
+
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
