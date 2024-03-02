@@ -12,13 +12,14 @@ library(tidyr)
 library(ggplot2)
 library(fixest)
 library(lubridate)
+library(vtable)
 ```
 
 You can add options to executable code like this
 
 ```{r}
 main_data <- read_dta("dta2.dta.gz")
-
+industry_names <- read.csv('indnames.csv')
 ```
 
 ```{r}
@@ -46,31 +47,40 @@ big_tib <- retail_tib %>% bind_rows(dining_tib) %>% bind_rows(entertainment_tib)
 main_data <- main_data %>% filter(!is.na(ind))
 main_data <- main_data %>% filter(year < 2023)
 
-# Join up main data frame with the actual industry name
+# Join up main data frame with the csv frame
 
-industry_sorted_data <- main_data %>% left_join(big_tib, join_by(ind))
+main_data <- main_data %>% right_join(industry_names, join_by(ind))
 
-industry_sorted_data <- industry_sorted_data %>% mutate(industry_f = replace_na(industry_name,'other')) %>% filter(durunemp < 999)
+# Join up main data frame with the data set we created to categorize 'general retail industries' together. 
 
-# Summarize the number of observations in our sample that are in each industry sector in each year 
+main_data <- main_data %>% left_join(big_tib, join_by(ind))
 
+main_data <- main_data %>% mutate(industry_name = replace_na(industry_name,'other'))%>% filter(!is.na(indname)) %>% mutate(date = make_date(year,month))
 
+# Need to change continuouweeks unemployed to 0 if it equals 999 - if we did not do this, it would wash out all the variance/drive the average of unemployed time per category way up. 
 
+main_data$durunemp <- replace(main_data$durunemp,main_data$durunemp > 998, 0)
 
+# Creating a variable to show weather or not the date is pre or post covid
+
+main_data <- main_data %>% mutate(post_covid = ymd(date) > ymd('2020-04-01'))
+
+# Filtering out individuals that are not in the labor force. Creating true/false variable for whether they are unemployed or not
+
+main_data <- main_data %>% filter(empstat <30) %>% mutate(unemployed = empstat > 12)
 ```
 
 ```{r}
+# creating a variable for weather or not we are after or before covid
+# Getting an actual date variable created and grouping observations by date, 
 
-data_by_month <- industry_sorted_data %>% group_by(industry_f,year,month) %>% summarise(avg_time_unempl = mean(durunemp)) 
+data_by_month <- main_data %>% group_by(indname,year,month) %>% summarise(avg_time_unempl = mean(durunemp)) %>% mutate(date = make_date(year,month))
 
-# Creating an actual date variable by combining month and year
+percent_unempl <- main_data %>% group_by(indname,date) %>% summarize(tot = n(),unempl = sum(unemployed)) %>% mutate(unem_rate = unempl/tot) %>% mutate(retail = indname == 'Retail Trade') %>% mutate(post_covid = ymd(date) > ymd('2020-04-01'))
 
-data_by_month <- data_by_month %>% mutate(date = make_date(year,month))
+# Plot to visualize the average duration of time un-emlpoyed for a given industry in a given year/month.
 
-
-ggplot(data = data_by_month %>% filter(industry_f %in% c('retail','other')),mapping = aes(x = date,y = avg_time_unempl, color = industry_f)) + geom_smooth()
-
-#model1 <- feols()
+ggplot(data = data_by_month %>% filter(indname %in% c('Retail Trade','Wholesale Trade')),mapping = aes(x = date,y = avg_time_unempl, color = indname)) + geom_smooth()
 
 
 # GET AVERAGE NUMBER OF PEOPLE UNEMPLOYED. 
@@ -81,4 +91,31 @@ ggplot(data = data_by_month %>% filter(industry_f %in% c('retail','other')),mapp
 # Sample weights
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+# Modeling
+
+# How has COVID affected the health of the retail industry, as measured by employment?
+
+# Model 1 - regressing 
+
+model1 <- feols(durunemp ~ post_covid + age, data = main_data %>% filter(indname == 'Retail Trade'))
+
+etable(model1)
+
+# The occurence of covid 19 is assosciated with an approximate 0.37 average increase in the duration of weeks unemployed for the retail industry. 
+```
+
+```{r}
+# How has retail fared relative to other industries?
+
+model2 <- feols(unem_rate~post_covid + retail,data = percent_unempl)
+etable(model2)
+
+# The occurence of covid 19 had a negative on employment rate overall but the retail industry did not have as much of a negative effect as other industries. 
+```
+
+Assumptions:
+
+People not in the labor force are not part of the data.
+
+People who did not report the duration of time that they were unemployed were manipulated to show that their duration of unemployment time was 0. We also filtered out people people that weren't in the labor force and we assume that they are either unemployed or employed.
