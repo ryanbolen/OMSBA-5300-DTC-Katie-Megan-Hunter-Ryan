@@ -9,12 +9,15 @@ editor: visual
 library(haven)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
+library(fixest)
+library(lubridate)
 ```
 
 You can add options to executable code like this
 
 ```{r}
-main_data <- read_dta("IPUMS.dta.gz")
+main_data <- read_dta("dta2.dta.gz")
 
 ```
 
@@ -47,16 +50,35 @@ main_data <- main_data %>% filter(year < 2023)
 
 industry_sorted_data <- main_data %>% left_join(big_tib, join_by(ind))
 
-industry_sorted_data <- industry_sorted_data %>% mutate(industry_f = replace_na(industry_name,'other'))
+industry_sorted_data <- industry_sorted_data %>% mutate(industry_f = replace_na(industry_name,'other')) %>% filter(durunemp < 999)
 
 # Summarize the number of observations in our sample that are in each industry sector in each year 
 
-obs_per_year <- industry_sorted_data %>% select(year,cpsid,ind,industry_name,industry_f)
-
-obs_per_year <- obs_per_year %>% group_by(year,industry_f) %>% summarise(tot = n())
 
 
 
+```
+
+```{r}
+
+data_by_month <- industry_sorted_data %>% group_by(industry_f,year,month) %>% summarise(avg_time_unempl = mean(durunemp)) 
+
+# Creating an actual date variable by combining month and year
+
+data_by_month <- data_by_month %>% mutate(date = make_date(year,month))
+
+
+ggplot(data = data_by_month %>% filter(industry_f %in% c('retail','other')),mapping = aes(x = date,y = avg_time_unempl, color = industry_f)) + geom_smooth()
+
+#model1 <- feols()
+
+
+# GET AVERAGE NUMBER OF PEOPLE UNEMPLOYED. 
+
+# Ideas:
+
+# Cutoff period - regression discontinuity. During this time, when did it hit?
+# Sample weights
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
