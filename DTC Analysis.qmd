@@ -18,26 +18,25 @@ library(vtable)
 You can add options to executable code like this
 
 ```{r}
-main_data <- read_dta("dta2.dta.gz")
+main_data <- read_dta("data3.dta.gz")
 industry_names <- read.csv('indnames.csv')
+
+# If you are having trouble loading everything, comment the next two lines out. Only time the hh income variable from this df is used is in the 3rd regression. 
+
+
+income_var <- read_dta('IPUMS.dta.gz')
+income_var <- income_var %>% select(cpsid,hhincome)
+
+main_data <- main_data %>% right_join(income_var,join_by(cpsid)) 
+main_data <- main_data %>% filter(!is.na(hhincome))
+
+# Join up main data frame with the csv frame
+
+main_data <- main_data %>% right_join(industry_names, join_by(ind))
 ```
 
 ```{r}
-# Categorizing different industries - capturing retail and pulling a few other 'comparable' industries into a tibble to join up with the main data frame. 
 
-retail_codes <- c(5580,5180,5180,1190,3895,4770,4795,5370,5381,5391,5275)
-
-retail_tib <- tibble(ind = retail_codes,industry_name = 'retail')
-
-dining_codes <- c(8680,8690)
-
-dining_tib <- tibble(ind = dining_codes,industry_name = 'dining')
-
-entertainment_codes <- c(8562,8564,8570,8580,8590)
-
-entertainment_tib <- tibble(ind = entertainment_codes, industry_name = 'entertainment')
-
-big_tib <- retail_tib %>% bind_rows(dining_tib) %>% bind_rows(entertainment_tib)
 ```
 
 ```{r}
@@ -47,15 +46,14 @@ big_tib <- retail_tib %>% bind_rows(dining_tib) %>% bind_rows(entertainment_tib)
 main_data <- main_data %>% filter(!is.na(ind))
 main_data <- main_data %>% filter(year < 2023)
 
-# Join up main data frame with the csv frame
 
-main_data <- main_data %>% right_join(industry_names, join_by(ind))
 
 # Join up main data frame with the data set we created to categorize 'general retail industries' together. 
 
-main_data <- main_data %>% left_join(big_tib, join_by(ind))
 
-main_data <- main_data %>% mutate(industry_name = replace_na(industry_name,'other'))%>% filter(!is.na(indname)) %>% mutate(date = make_date(year,month))
+#main_data <- main_data %>% left_join(big_tib, join_by(ind))
+
+main_data <- main_data %>% mutate(date = make_date(year,month))
 
 # Need to change continuouweeks unemployed to 0 if it equals 999 - if we did not do this, it would wash out all the variance/drive the average of unemployed time per category way up. 
 
@@ -63,11 +61,21 @@ main_data$durunemp <- replace(main_data$durunemp,main_data$durunemp > 998, 0)
 
 # Creating a variable to show weather or not the date is pre or post covid
 
-main_data <- main_data %>% mutate(post_covid = ymd(date) > ymd('2020-04-01'))
+main_data <- main_data %>% mutate(post_covid = ymd(date) > ymd('2020-03-01'))
 
 # Filtering out individuals that are not in the labor force. Creating true/false variable for whether they are unemployed or not
 
 main_data <- main_data %>% filter(empstat <30) %>% mutate(unemployed = empstat > 12)
+
+# Make a date variable by combining month and date
+
+main_data <- main_data %>% filter(ymd(date) != ymd('2020-03-01'))
+
+# Make a binary variable (T or F) for Female or Male
+
+main_data <- main_data %>% mutate(female = sex == 2)
+
+
 ```
 
 ```{r}
@@ -96,13 +104,17 @@ ggplot(data = data_by_month %>% filter(indname %in% c('Retail Trade','Wholesale 
 
 # How has COVID affected the health of the retail industry, as measured by employment?
 
-# Model 1 - regressing 
+# Model 1 - regressing independent variable is average duration of unemployment. 
 
 model1 <- feols(durunemp ~ post_covid + age, data = main_data %>% filter(indname == 'Retail Trade'))
 
 etable(model1)
 
 # The occurence of covid 19 is assosciated with an approximate 0.37 average increase in the duration of weeks unemployed for the retail industry. 
+
+
+
+
 ```
 
 ```{r}
@@ -114,8 +126,24 @@ etable(model2)
 # The occurence of covid 19 had a negative on employment rate overall but the retail industry did not have as much of a negative effect as other industries. 
 ```
 
+```{r}
+# Retail needs to worry about who has money to spend - what has changed about who is working and earning money (this regression needs to take into account all industries -  need an income variable - family household income is categorized as a range of incomes and it's not in a particularly useful order)?
+
+model3 <- feols(log(hhincome)~post_covid + female + age, data = main_data)
+
+etable(model3)
+```
+
 Assumptions:
+
+Observations where industry type was recorded as na were omitted so that we are only measuring industries where we can categorize the industry name.
 
 People not in the labor force are not part of the data.
 
 People who did not report the duration of time that they were unemployed were manipulated to show that their duration of unemployment time was 0. We also filtered out people people that weren't in the labor force and we assume that they are either unemployed or employed.
+
+!!!!!!!
+
+Might be good to use this assumption:
+
+The data available for this study is provided on a monthly basis. In order to best answer the research questions here, we are focusing on framing the data in two categories: pre covid (prior to March 2020) and post covid (post March 2020). In order to best characterize these periods and get a true 'before and after effect' we omit observations in March 2020. (This is 'during covid' and is a very small portion of the sample data and does not distinctly fit into pre or post covid time frames).
