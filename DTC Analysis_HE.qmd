@@ -158,7 +158,13 @@ etable(model23)
 
 #In this setup, each industry's impact on the unemployment rate relative to retail both before and after the onset of COVID-19 can be assessed through the coefficients of the interaction terms.
 
-model_industry_comparison <- feols(unem_rate ~ post_covid * (wholesale_trade + information + finance_insurance_realestate + professional_scientific_management + educational_services_healthcare + arts_entertainment_recreation + other_services + manufacturing + agriculture_forestry_fishing_mining + military + public_administration + transportation_warehousing_utilities + construction), data = your_data_frame)
+
+# Using 'indname' factor in the feols regression model
+model_industry_comparison <- feols(unem_rate ~ post_covid * indname, data = percent_unempl)
+etable(model_industry_comparison)
+
+
+
 
 
 ```
