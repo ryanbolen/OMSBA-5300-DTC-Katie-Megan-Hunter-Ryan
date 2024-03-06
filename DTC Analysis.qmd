@@ -18,7 +18,7 @@ library(vtable)
 You can add options to executable code like this
 
 ```{r}
-main_data <- read_dta("data3.dta.gz")
+main_data <- read_dta("finaldata.dta.gz") # Adding an education variable
 industry_names <- read.csv('indnames.csv')
 
 # If you are having trouble loading everything, comment the next two lines out. Only time the hh income variable from this df is used is in the 3rd regression. 
@@ -47,11 +47,7 @@ main_data <- main_data %>% filter(!is.na(ind))
 main_data <- main_data %>% filter(year < 2023)
 
 
-
 # Join up main data frame with the data set we created to categorize 'general retail industries' together. 
-
-
-#main_data <- main_data %>% left_join(big_tib, join_by(ind))
 
 main_data <- main_data %>% mutate(date = make_date(year,month))
 
@@ -82,13 +78,13 @@ main_data <- main_data %>% mutate(female = sex == 2)
 # creating a variable for weather or not we are after or before covid
 # Getting an actual date variable created and grouping observations by date, 
 
-data_by_month <- main_data %>% group_by(indname,year,month) %>% summarise(avg_time_unempl = mean(durunemp)) %>% mutate(date = make_date(year,month))
+percent_unempl <- main_data %>% group_by(indname,date) %>% summarize(tot = n(),unempl = sum(unemployed),avg_time_unempl = mean(durunemp)) %>% mutate(unem_rate = unempl/tot) %>% mutate(retail = indname == 'Retail Trade') %>% mutate(post_covid = ymd(date) > ymd('2020-04-01'))
 
-percent_unempl <- main_data %>% group_by(indname,date) %>% summarize(tot = n(),unempl = sum(unemployed)) %>% mutate(unem_rate = unempl/tot) %>% mutate(retail = indname == 'Retail Trade') %>% mutate(post_covid = ymd(date) > ymd('2020-04-01'))
+
 
 # Plot to visualize the average duration of time un-emlpoyed for a given industry in a given year/month.
 
-ggplot(data = data_by_month %>% filter(indname %in% c('Retail Trade','Wholesale Trade')),mapping = aes(x = date,y = avg_time_unempl, color = indname)) + geom_smooth()
+ggplot(data = percent_unempl %>% filter(indname %in% c('Retail Trade','Wholesale Trade')),mapping = aes(x = date,y = avg_time_unempl, color = indname)) + geom_smooth()
 
 
 # GET AVERAGE NUMBER OF PEOPLE UNEMPLOYED. 
@@ -106,14 +102,19 @@ ggplot(data = data_by_month %>% filter(indname %in% c('Retail Trade','Wholesale 
 
 # Model 1 - regressing independent variable is average duration of unemployment. 
 
-model1 <- feols(durunemp ~ post_covid + age, data = main_data %>% filter(indname == 'Retail Trade'))
+model1 <- feols(unem_rate ~ post_covid, data = percent_unempl %>% filter(indname == 'Retail Trade'))
 
-etable(model1)
+main_data <- main_data %>% mutate(cert_required = jobcert == 2) # Making binary variable for weather or not certification is required for job. Assumes non entries have no job certification requirements.
 
-# The occurence of covid 19 is assosciated with an approximate 0.37 average increase in the duration of weeks unemployed for the retail industry. 
+model1A <- feols(durunemp~post_covid + cert_required + post_covid * cert_required, data = main_data %>% filter(indname == 'Retail Trade'))
+
+etable(model1, model1A)
 
 
+# Model 1 - just looking at unemployment rate and how it changed post covid for just the retail industry: covid caused the unemployment rate to increase by 0.39% for the retail industry. This is not significant and it's likely because we aren't looking at a very big sample size once all of the observations are grouped into month (we had to do this to get unemployment rate)
 
+
+# Model 1A - the post covid period saw apprixmately a half week increase in the amount of time people reported being unemployed. People with certifications/people who held jobs that required certifications were generally laid off for a shorter amount of time (0.55 weeks less). The interaction term shows us that in the post covid period, people with job cert requirements were unemployed for a shorter duration (approx. 0.3 weeks) relative to people without job certification requirements. 
 
 ```
 
@@ -123,8 +124,16 @@ etable(model1)
 model2 <- feols(unem_rate~post_covid + retail,data = percent_unempl)
 etable(model2)
 
+#model2A <- feols(unem_rate~post_covid + retail,data = percent_unempl %>% filter(indname %in% c('')))
+
 # The occurence of covid 19 had a negative on employment rate overall but the retail industry did not have as much of a negative effect as other industries. 
+
+# Could make a binary variable about which industries were essential or not - 
 ```
+
+model3 \<- feols(log(hhincome)\~post_covid + female + age, data = main_data)
+
+etable(model3)
 
 ```{r}
 # Retail needs to worry about who has money to spend - what has changed about who is working and earning money (this regression needs to take into account all industries -  need an income variable - family household income is categorized as a range of incomes and it's not in a particularly useful order)?
@@ -147,3 +156,7 @@ People who did not report the duration of time that they were unemployed were ma
 Might be good to use this assumption:
 
 The data available for this study is provided on a monthly basis. In order to best answer the research questions here, we are focusing on framing the data in two categories: pre covid (prior to March 2020) and post covid (post March 2020). In order to best characterize these periods and get a true 'before and after effect' we omit observations in March 2020. (This is 'during covid' and is a very small portion of the sample data and does not distinctly fit into pre or post covid time frames).
+
+Possible assumption \*\*
+
+Assumes non entries have no job certification requirements (999 is NA on ipums) so 999 for this field = false
