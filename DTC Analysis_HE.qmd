@@ -147,8 +147,8 @@ etable(model22)
 # The occurence of covid 19 had a negative on employment rate overall but the retail industry did not have as much of a negative effect as other industries.
 
 #However, it's crucial to add an interaction term between post_covid and retail to see if the change in unemployment rates after COVID-19 was different for the retail industry compared to other industries.
-model22 <- feols(unem_rate ~ post_covid * retail, data = percent_unempl)
-
+model23 <- feols(unem_rate ~ post_covid * retail, data = percent_unempl)
+etable(model23)
 #allows the model to estimate the differential effect of COVID-19 on the unemployment rate in the retail sector relative to other sectors.
 
 # Assuming 'retail_trade' is the reference category and is omitted from the model to avoid multicollinearity
@@ -166,7 +166,7 @@ model_industry_comparison <- feols(unem_rate ~ post_covid * (wholesale_trade + i
 ```{r}
 # Retail needs to worry about who has money to spend - what has changed about who is working and earning money (this regression needs to take into account all industries -  need an income variable - family household income is categorized as a range of incomes and it's not in a particularly useful order)?
 
-model3 <- feols(log(hhincome)~post_covid + female + age, data = main_data)
+model3 <- feols(log(hhincome)~post_covid + female + age + educ_factor, data = main_data)
 
 etable(model3)
 ```
