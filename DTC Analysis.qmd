@@ -19,7 +19,7 @@ You can add options to executable code like this
 
 ```{r}
 main_data <- read_dta("finaldata.dta.gz") # Adding an education variable
-industry_names <- read.csv('indnames.csv')
+industry_names <- read.csv('indnames.csv') # Hellllooo
 
 # If you are having trouble loading everything, comment the next two lines out. Only time the hh income variable from this df is used is in the 3rd regression. 
 
