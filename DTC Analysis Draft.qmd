@@ -123,17 +123,13 @@ etable(retail_comparison)
 # The occurence of covid 19 had a negative on employment rate overall but the retail industry did not have as much of a negative effect as other industries.
 
 #However, it's crucial to add an interaction term between post_covid and retail to see if the change in unemployment rates after COVID-19 was different for the retail industry compared to other industries.
-retail_comparison_interaction <- feols(unem_rate ~ post_covid * retail, data = percent_unempl)
+retail_comparison_interaction <- feols(unem_rate ~ post_covid  + retail + post_covid * retail, data = percent_unempl)
 etable(retail_comparison_interaction)
 #allows the model to estimate the differential effect of COVID-19 on the unemployment rate in the retail sector relative to other sectors.
 
 # Assuming 'retail_trade' is the reference category and is omitted from the model to avoid multicollinearity
 
-#In this setup, each industry's impact on the unemployment rate relative to retail both before and after the onset of COVID-19 can be assessed through the coefficients of the interaction terms.
 
-# Using 'indname' factor in the feols regression model
-model_industry_comparison <- feols(unem_rate ~ post_covid * indname, data = percent_unempl)
-etable(model_industry_comparison)
 
 
 
@@ -161,7 +157,7 @@ main_data$educ_factor <- as.factor(main_data$educ_factor)
 
 earnings_model <- feols(log(hhincome)~post_covid + female + age + educ_factor, data = main_data)
 
-etable(earnings_model)
+etable(earnings_model,vcov = 'hetero')
 ```
 
 Assumptions:
@@ -184,4 +180,10 @@ The data available for this study is provided on a monthly basis. In order to be
 # Updated Model with Education
 #retail_health_educ <- feols(durunemp ~ post_covid + age + educ_factor, data = main_data %>% filter(indname == 'Retail Trade'))
 #etable(retail_health_educ)
+
+#In this setup, each industry's impact on the unemployment rate relative to retail both before and after the onset of COVID-19 can be assessed through the coefficients of the interaction terms.
+
+# Using 'indname' factor in the feols regression model
+# model_industry_comparison <- feols(unem_rate ~ post_covid + indname + post_covid * indname, data = percent_unempl)
+# etable(model_industry_comparison)
 ```
