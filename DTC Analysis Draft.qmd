@@ -1,7 +1,9 @@
 ---
 author: "Ryan Bolen, Katie Yamabe, Megan Mixon, Hunter Elliott"
 title: "DTC"
-format: html
+format:
+  docx: 
+    echo: true
 editor: visual
 ---
 
@@ -24,11 +26,11 @@ industry_names <- read.csv('indnames.csv')
 # If you are having trouble loading everything, comment the next two lines out. Only time the hh income variable from this df is used is in the 3rd regression. 
 
 
-#income_var <- read_dta('IPUMS.dta.gz')
-#income_var <- income_var %>% select(cpsid,hhincome)
+income_var <- read_dta('IPUMS.dta.gz')
+income_var <- income_var %>% select(cpsid,hhincome)
 
-#main_data <- main_data %>% right_join(income_var,join_by(cpsid)) 
-#main_data <- main_data %>% filter(!is.na(hhincome))
+main_data <- main_data %>% right_join(income_var,join_by(cpsid)) 
+main_data <- main_data %>% filter(!is.na(hhincome))
 
 # Join up main data frame with the csv frame
 
@@ -76,27 +78,25 @@ main_data <- main_data %>% filter(ymd(date) != ymd('2020-03-01'))
 main_data <- main_data %>% mutate(female = sex == 2)
 
 
+
 ```
 
 ```{r}
 # creating a variable for weather or not we are after or before covid
 # Getting an actual date variable created and grouping observations by date, 
 
-data_by_month <- main_data %>% group_by(indname,year,month) %>% summarise(avg_time_unempl = mean(durunemp)) %>% mutate(date = make_date(year,month))
+#data_by_month <- main_data %>% group_by(indname,year,month) %>% summarise(avg_time_unempl = mean(durunemp)) %>% mutate(date = make_date(year,month))
 
 percent_unempl <- main_data %>% group_by(indname,date) %>% summarize(tot = n(),unempl = sum(unemployed)) %>% mutate(unem_rate = unempl/tot) %>% mutate(retail = indname == 'Retail Trade') %>% mutate(post_covid = ymd(date) > ymd('2020-04-01'))
 
+#Rename the category for arts, dining entertainment, recreation because it is too long of a name and makes the graph look silly
+
+percent_unempl$indname <- replace(percent_unempl$indname,percent_unempl$indname == 'Arts, Entertainment, and Recreation, and Accommodation and Food Services','Dining & Entertainment')
+
 # Plot to visualize the average duration of time un-emlpoyed for a given industry in a given year/month.
 
-ggplot(data = data_by_month %>% filter(indname %in% c('Retail Trade','Wholesale Trade')),mapping = aes(x = date,y = avg_time_unempl, color = indname)) + geom_smooth()
+ggplot(data = percent_unempl %>% filter(indname %in% c('Retail Trade','Wholesale Trade','Manufacturing','Construction','Dining & Entertainment')),mapping = aes(x = date,y = unem_rate, color = indname)) + geom_smooth()
 
-
-# GET AVERAGE NUMBER OF PEOPLE UNEMPLOYED. 
-
-# Ideas:
-
-# Cutoff period - regression discontinuity. During this time, when did it hit?
-# Sample weights
 ```
 
 ```{r}
@@ -104,11 +104,11 @@ ggplot(data = data_by_month %>% filter(indname %in% c('Retail Trade','Wholesale 
 
 # How has COVID affected the health of the retail industry, as measured by employment?
 
-# Model 1 - regressing independent variable is average duration of unemployment. 
+# Model 1 - regressing dependent variable is average duration of unemployment. 
 
-model1 <- feols(durunemp ~ post_covid + age, data = main_data %>% filter(indname == 'Retail Trade'))
+retail_health <- feols(durunemp ~ post_covid + age, data = main_data %>% filter(indname == 'Retail Trade'))
 
-etable(model1)
+etable(retail_health)
 
 # Recode 'educ' to a factor with more interpretable levels
 main_data <- main_data %>%
@@ -126,29 +126,24 @@ main_data <- main_data %>%
 main_data$educ_factor <- as.factor(main_data$educ_factor)
 
 # Updated Model with Education
-model2 <- feols(durunemp ~ post_covid + age + educ_factor, data = main_data %>% filter(indname == 'Retail Trade'))
+retail_health_educ <- feols(durunemp ~ post_covid + age + educ_factor, data = main_data %>% filter(indname == 'Retail Trade'))
 
-etable(model2)
-
+etable(retail_health_educ)
 
 # The occurence of covid 19 is assosciated with an approximate 0.37 average increase in the duration of weeks unemployed for the retail industry. 
-
-
-
-
 ```
 
 ```{r}
 # How has retail fared relative to other industries?
 
-model22 <- feols(unem_rate~post_covid + retail,data = percent_unempl)
-etable(model22)
+retail_comparison <- feols(unem_rate~post_covid + retail,data = percent_unempl)
+etable(retail_comparison)
 
 # The occurence of covid 19 had a negative on employment rate overall but the retail industry did not have as much of a negative effect as other industries.
 
 #However, it's crucial to add an interaction term between post_covid and retail to see if the change in unemployment rates after COVID-19 was different for the retail industry compared to other industries.
-model23 <- feols(unem_rate ~ post_covid * retail, data = percent_unempl)
-etable(model23)
+retail_comparison_interaction <- feols(unem_rate ~ post_covid * retail, data = percent_unempl)
+etable(retail_comparison_interaction)
 #allows the model to estimate the differential effect of COVID-19 on the unemployment rate in the retail sector relative to other sectors.
 
 # Assuming 'retail_trade' is the reference category and is omitted from the model to avoid multicollinearity
@@ -171,7 +166,7 @@ etable(model_industry_comparison)
 
 earnings_model <- feols(log(hhincome)~post_covid + female + age + educ_factor, data = main_data)
 
-etable(model3)
+etable(earnings_model)
 ```
 
 Assumptions:
