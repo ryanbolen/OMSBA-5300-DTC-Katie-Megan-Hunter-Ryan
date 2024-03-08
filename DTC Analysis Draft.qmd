@@ -106,29 +106,10 @@ ggplot(data = percent_unempl %>% filter(indname %in% c('Retail Trade','Wholesale
 
 # Model 1 - regressing dependent variable is average duration of unemployment. 
 
-retail_health <- feols(durunemp ~ post_covid + age, data = main_data %>% filter(indname == 'Retail Trade'))
+retail_health <- feols(durunemp ~ post_covid, data = main_data %>% filter(indname == 'Retail Trade'))
 
 etable(retail_health)
 
-# Recode 'educ' to a factor with more interpretable levels
-main_data <- main_data %>%
-  mutate(educ_factor = case_when(
-    educ %in% 0:5 ~ "No schooling/Primary",
-    educ %in% 6:11 ~ "Some high school",
-    educ %in% 12:73 ~ "High school graduate",
-    educ %in% 74:81 ~ "Some college",
-    educ %in% 91:92 ~ "Associate degree",
-    educ %in% 100:125 ~ "Bachelor's degree or higher",
-    TRUE ~ "Other/Unknown"
-  ))
-
-# Convert to a factor for regression analysis
-main_data$educ_factor <- as.factor(main_data$educ_factor)
-
-# Updated Model with Education
-retail_health_educ <- feols(durunemp ~ post_covid + age + educ_factor, data = main_data %>% filter(indname == 'Retail Trade'))
-
-etable(retail_health_educ)
 
 # The occurence of covid 19 is assosciated with an approximate 0.37 average increase in the duration of weeks unemployed for the retail industry. 
 ```
@@ -150,7 +131,6 @@ etable(retail_comparison_interaction)
 
 #In this setup, each industry's impact on the unemployment rate relative to retail both before and after the onset of COVID-19 can be assessed through the coefficients of the interaction terms.
 
-
 # Using 'indname' factor in the feols regression model
 model_industry_comparison <- feols(unem_rate ~ post_covid * indname, data = percent_unempl)
 etable(model_industry_comparison)
@@ -163,6 +143,21 @@ etable(model_industry_comparison)
 
 ```{r}
 # Retail needs to worry about who has money to spend - what has changed about who is working and earning money (this regression needs to take into account all industries -  need an income variable - family household income is categorized as a range of incomes and it's not in a particularly useful order)?
+
+# Recode 'educ' to a factor with more interpretable levels
+main_data <- main_data %>%
+  mutate(educ_factor = case_when(
+    educ %in% 0:5 ~ "No schooling/Primary",
+    educ %in% 6:11 ~ "Some high school",
+    educ %in% 12:73 ~ "High school graduate",
+    educ %in% 74:81 ~ "Some college",
+    educ %in% 91:92 ~ "Associate degree",
+    educ %in% 100:125 ~ "Bachelor's degree or higher",
+    TRUE ~ "Other/Unknown"
+  ))
+
+# Convert to a factor for regression analysis
+main_data$educ_factor <- as.factor(main_data$educ_factor)
 
 earnings_model <- feols(log(hhincome)~post_covid + female + age + educ_factor, data = main_data)
 
@@ -182,3 +177,11 @@ People who did not report the duration of time that they were unemployed were ma
 Might be good to use this assumption:
 
 The data available for this study is provided on a monthly basis. In order to best answer the research questions here, we are focusing on framing the data in two categories: pre covid (prior to March 2020) and post covid (post March 2020). In order to best characterize these periods and get a true 'before and after effect' we omit observations in March 2020. (This is 'during covid' and is a very small portion of the sample data and does not distinctly fit into pre or post covid time frames).
+
+```{r}
+# Parking Lot
+
+# Updated Model with Education
+#retail_health_educ <- feols(durunemp ~ post_covid + age + educ_factor, data = main_data %>% filter(indname == 'Retail Trade'))
+#etable(retail_health_educ)
+```
